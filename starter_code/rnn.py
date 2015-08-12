@@ -135,9 +135,10 @@ class RNN:
         node.probs = np.exp(x) / np.sum(np.exp(x))
         
         correct += [node.label]
-        guess += [np.max(node.probs)]
+        guess += [np.argmax(node.probs)]
         
-        cost += -np.sum(np.log(node.probs[node.label]))
+        cost -= np.log(node.probs[node.label])
+        #cost -= np.sum(np.log(node.probs[node.label]))
         node.fprop = True
         
         return cost, total + 1
@@ -173,8 +174,9 @@ class RNN:
         
         if error is not None:
             delta += error
-        #???
-        delta *= (node.hActs1 != 0)
+        
+        delta[node.hActs1 == 0] = 0
+        #delta *= (node.hActs1 != 0)
         
         if node.isLeaf:
             #??

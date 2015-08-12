@@ -64,7 +64,7 @@ def run(args=None):
 
     # Testing
     if opts.test:
-        test(opts.inFile,opts.data,opts.model)
+        test(opts.inFile,opts.data,opts.model,e = 0)
         return
     
     print "Loading data..."
@@ -108,9 +108,10 @@ def run(args=None):
             nn.toFile(fid)
         if evaluate_accuracy_while_training:
             print "testing on training set real quick"
-            train_accuracies.append(test(opts.outFile,"train",opts.model,trees))
+            
+            train_accuracies.append(test(opts.outFile,"train",opts.model,trees, e))
             print "testing on dev set real quick"
-            dev_accuracies.append(test(opts.outFile,"dev",opts.model,dev_trees))
+            dev_accuracies.append(test(opts.outFile,"dev",opts.model,dev_trees, e))
             # clear the fprop flags in trees and dev_trees
             for tree in trees:
                 tr.leftTraverse(tree.root,nodeFn=tr.clearFprop)
@@ -120,13 +121,27 @@ def run(args=None):
 
 
     if evaluate_accuracy_while_training:
-        pdb.set_trace()
+        #pdb.set_trace()
         print train_accuracies
         print dev_accuracies
+        np.save(str(opts.wvecDim) + "train_accuracies.npy", train_accuracies)
+        np.save(str(opts.wvecDim) + "dev_accuracies.npy", dev_accuracies)
+        #####
         # TODO:
         # Plot train/dev_accuracies here?
+        #####
+        #x = range(opts.epochs)
+        #plt.figure(figsize=(10,6), dpi=80)
+        #plt.plot(x, train_accuracies, color='b', marker='o', linestyle='-', label="training acc")
+        #plt.plot(x, dev_accuracies, color='g', marker='o', linestyle='-', label="dev acc")
+        #plt.xlabel('Epochs')
+        #plt.ylabel('Accuracies')
+        #plt.title('Accuracies of train and dev over wvecdim 30')
+        #plt.legend("top left")
+        #plt.savefig("Accuracies_of_train_dev_over_wvecdim_30.png")
+        #plt.show()
 
-def test(netFile,dataSet, model='RNN', trees=None):
+def test(netFile,dataSet, model='RNN', trees=None, e = 0):
     if trees==None:
         trees = tr.loadTrees(dataSet)
     assert netFile is not None, "Must give model to test"
@@ -161,14 +176,19 @@ def test(netFile,dataSet, model='RNN', trees=None):
     
     # TODO
     # Plot the confusion matrix?
-
-    
+    if e == 29:
+        conf_arr = np.zeros((5, 5))
+        for i in xrange(len(correct)):
+            correct_ind = correct[i]
+            guess_ind = guess[i]
+            conf_arr[correct_ind][guess_ind] += 1
+        makeconf(conf_arr, e)
     
     print "Cost %f, Acc %f"%(cost,correct_sum/float(total))
     return correct_sum/float(total)
 
 
-def makeconf(conf_arr):
+def makeconf(conf_arr, e=0):
     # makes a confusion matrix plot when provided a matrix conf_arr
     norm_conf = []
     for i in conf_arr:
@@ -200,9 +220,9 @@ def makeconf(conf_arr):
     plt.xticks(range(width), indexs[:width])
     plt.yticks(range(height), indexs[:height])
     # you can save the figure here with:
-    # plt.savefig("pathname/image.png")
+    plt.savefig(str(e) + "ConfusionMatrix.png")
 
-    plt.show()
+    #plt.show()
 
 
 if __name__=='__main__':
