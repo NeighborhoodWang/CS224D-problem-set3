@@ -113,7 +113,45 @@ class RNN2:
     def forwardProp(self,node, correct=[], guess=[]):
         cost  =  total = 0.0
         # this is exactly the same setup as forwardProp in rnn.py
+        # Word vectors
+        L = self.L
+
+        # Hidden activation weights for layer 1
+        W1 = self.W1
+        b1 = self.b1
+
+        # Hidden activation weights for layer 2
+        W2 = self.W2
+        b2 = self.b2
+
+        # Softmax weights
+        Ws = self.Ws 
+        bs = self.bs
         
+        if node.isLeaf:
+            node.hActs1 = L[:, node.word]
+        else:
+            if not node.left.fprop:
+                cost_left, total_left = self.forwardProp(node.left, correct, guess)
+                cost += cost_left
+                total += total_left
+            if not node.right.fprop:
+                cost_right, total_right = self.forwardProp(node.right, correct, guess)
+                cost += cost_right
+                total += total_right
+            node.hActs1 = W1.dot(np.hstack((node.left.hActs1, node.right.hActs1))) + b1
+            node.hActs1[node.hActs1 < 0] = 0
+        node.hActs2 = W2.dot(node.hActs1) + b2
+        node.hActs2[node.hActs2 < 0] = 0
+        x = Ws.dot(node.hActs2) + bs
+        x -= np.max(x)
+        expX = np.exp(x)
+        node.probs = expX / np.sum(expX)
+            
+        correct += [node.label]
+        guess += [np.argmax(node.probs)]
+        cost -= np.log(node.probs[node.label])
+        node.fprop = True
 
         return cost, total + 1
 
@@ -123,8 +161,48 @@ class RNN2:
         node.fprop = False
 
         # this is exactly the same setup as backProp in rnn.py
+        # Word vectors
+        L = self.L
+
+        # Hidden activation weights for layer 1
+        W1 = self.W1
+        b1 = self.b1
+
+        # Hidden activation weights for layer 2
+        W2 = self.W2
+        b2 = self.b2
+
+        # Softmax weights
+        Ws = self.Ws 
+        bs = self.bs
         
+        error_this = node.probs
+        error_this[node.label] -= 1.0
+        delta = Ws.T.dot(error_this)
         
+        self.dWs += np.outer(error_this, node.hActs2)
+        self.dbs += error_this
+        
+        delta[node.hActs2 == 0] = 0
+        self.dW2 += np.outer(delta, node.hActs1)
+        self.db2 += delta
+        
+        delta = W2.T.dot(delta)
+        if error is not None:
+            delta += error
+        delta[node.hActs1 == 0] = 0
+        
+        if node.isLeaf:
+            self.dL[node.word] += delta
+        else:
+            self.dW1 += np.outer(delta, np.hstack([node.left.hActs1, node.right.hActs1]))
+            self.db1 += delta
+            
+            delta = W1.T.dot(delta)
+            delta_left = delta[:self.wvecDim]
+            delta_right = delta[self.wvecDim:]
+            self.backProp(node.left, delta_left)
+            self.backProp(node.right, delta_right)
 
         
     def updateParams(self,scale,update,log=False):
